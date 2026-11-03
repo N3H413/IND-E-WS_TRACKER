@@ -76,13 +76,28 @@ function rowsToRuns(rows: string[][], tab: string, src: Source, warnings: string
 }
 
 let cache: { at: number; data: DashPayload } | null = null;
-
+function getPrivateKey(): string {
+  let k = (process.env.GOOGLE_PRIVATE_KEY ?? "").trim();
+  // Remove surrounding quotes if they were pasted into the env var
+  if ((k.startsWith('"') && k.endsWith('"')) || (k.startsWith("'") && k.endsWith("'"))) {
+    k = k.slice(1, -1);
+  }
+  // Decode base64-encoded keys
+  if (!k.includes("BEGIN")) {
+    try {
+      k = Buffer.from(k, "base64").toString("utf8");
+    } catch {
+      /* leave as is */
+    }
+  }
+  return k.replace(/\\n/g, "\n");
+}
 export async function loadRuns(): Promise<DashPayload> {
   if (cache && Date.now() - cache.at < 60_000) return cache.data; // protects Sheets API quota
 
   const auth = new google.auth.JWT({
-    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim(),
+    key: getPrivateKey(),
     scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
   });
   const sheets = google.sheets({ version: "v4", auth });
